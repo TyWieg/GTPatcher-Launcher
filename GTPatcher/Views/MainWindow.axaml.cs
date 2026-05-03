@@ -18,6 +18,8 @@ using System.Collections.ObjectModel;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using System.Reflection;
+using Avalonia.Threading;
+using GTPatcher.Assets;
 
 namespace GTPatcher.Views
 {
@@ -29,11 +31,13 @@ namespace GTPatcher.Views
 
         private async Task ShowMessageBox(string title, string message)
         {
-            var box = MessageBoxManager
-                  .GetMessageBoxStandard(title, message,
-                      ButtonEnum.Ok);
+            await Dispatcher.UIThread.InvokeAsync(async () => {
+                var box = MessageBoxManager
+                      .GetMessageBoxStandard(title, message,
+                          ButtonEnum.Ok);
 
-            await box.ShowAsync();
+                await box.ShowAsync();
+            });
         }
 
         public MainWindow()
@@ -62,61 +66,45 @@ namespace GTPatcher.Views
                 }
             };
 
-            LoadBuilds();
+            Dispatcher.UIThread.Post(() => LoadBuilds(), DispatcherPriority.Background);
         }
 
         private void LoadBuilds()
         {
             try
             {
-                ViewModel.DebugInfo = "Loading builds...";
-                var assembly = Assembly.GetExecutingAssembly();
-                var resourceName = "GTPatcher.Assets.steamBuilds.json";
+                ViewModel.DebugInfo = "Loading builds from static data...";
+                var buildsJson = StaticBuildData.JsonData;
 
-                using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
+                var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
+                if (builds != null)
                 {
-                    if (stream == null)
+                    var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
+                    var entries = new List<ListEntry>();
+                    int currentYear = -1;
+
+                    foreach (var build in sortedBuilds)
                     {
-                        ViewModel.DebugInfo = $"Resource not found: {resourceName}. Available: " + string.Join(", ", assembly.GetManifestResourceNames());
-                        _ = ShowMessageBox("Error", ViewModel.DebugInfo);
-                        return;
+                        if (build.Year != currentYear)
+                        {
+                            currentYear = build.Year;
+                            entries.Add(new YearHeader { Year = currentYear });
+                        }
+                        entries.Add(new PatchEntry { Patch = build });
                     }
 
-                    using (var reader = new StreamReader(stream))
-                    {
-                        var buildsJson = reader.ReadToEnd();
-                        var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
-                        if (builds != null)
-                        {
-                            ViewModel.DebugInfo = $"Loaded {builds.Count} builds.";
-                            var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
-                            var entries = new List<ListEntry>();
-                            int currentYear = -1;
-
-                            foreach (var build in sortedBuilds)
-                            {
-                                if (build.Year != currentYear)
-                                {
-                                    currentYear = build.Year;
-                                    entries.Add(new YearHeader { Year = currentYear });
-                                }
-                                entries.Add(new PatchEntry { Patch = build });
-                            }
-
-                            ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
-                            ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
-                        }
-                        else
-                        {
-                            ViewModel.DebugInfo = "Builds list is null after deserialization.";
-                        }
-                    }
+                    ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
+                    ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
+                    ViewModel.DebugInfo = $"Successfully loaded {builds.Count} builds.";
+                }
+                else
+                {
+                    ViewModel.DebugInfo = "Failed to deserialize builds JSON.";
                 }
             }
             catch (Exception ex)
             {
-                ViewModel.DebugInfo = "Failed to load builds: " + ex.Message;
-                _ = ShowMessageBox("Error", ViewModel.DebugInfo);
+                ViewModel.DebugInfo = "Error loading builds: " + ex.Message;
             }
             
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -129,7 +117,9 @@ namespace GTPatcher.Views
         {
             Settings.Path = ViewModel.InstallationPath;
             Settings.Username = ViewModel.SteamUsername;
-            File.WriteAllText(SettingsPath, JsonConvert.SerializeObject(Settings));
+            try {
+                File.WriteAllText(SettingsPath, JsonConvert.SerializeObject(Settings));
+            } catch { }
         }
 
         private async void PlayButton(object sender, RoutedEventArgs e)
@@ -235,7 +225,7 @@ namespace GTPatcher.Views
                 AllowMultiple = false
             });
 
-            if (folders.Count > 0)
+            if (folders != null && folders.Count > 0)
             {
                 ViewModel.InstallationPath = folders[0].Path.LocalPath;
             }

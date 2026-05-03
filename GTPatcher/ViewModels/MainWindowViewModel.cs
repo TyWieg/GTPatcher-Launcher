@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using GTPatcher.Types;
 using ReactiveUI;
+using System.IO;
+using System;
 
 namespace GTPatcher.ViewModels
 {
-    public class ListEntry { }
+    public abstract class ListEntry : ReactiveObject { }
 
     public class YearHeader : ListEntry
     {
@@ -15,6 +17,13 @@ namespace GTPatcher.ViewModels
     public class PatchEntry : ListEntry
     {
         public Patch Patch { get; set; } = null!;
+
+        private bool _isDownloaded;
+        public bool IsDownloaded
+        {
+            get => _isDownloaded;
+            set => this.RaiseAndSetIfChanged(ref _isDownloaded, value);
+        }
     }
 
     public class MainWindowViewModel : ViewModelBase
@@ -36,6 +45,7 @@ namespace GTPatcher.ViewModels
                 if (value is PatchEntry pe)
                 {
                     SelectedPatch = pe.Patch;
+                    UpdateDownloadedStatus();
                 }
             }
         }
@@ -65,7 +75,37 @@ namespace GTPatcher.ViewModels
         public string InstallationPath
         {
             get => _installationPath;
-            set => this.RaiseAndSetIfChanged(ref _installationPath, value);
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _installationPath, value);
+                UpdateDownloadedStatus();
+            }
+        }
+
+        private string _statusText = "Ready";
+        public string StatusText
+        {
+            get => _statusText;
+            set => this.RaiseAndSetIfChanged(ref _statusText, value);
+        }
+
+        public void UpdateDownloadedStatus()
+        {
+            if (string.IsNullOrEmpty(InstallationPath)) return;
+
+            foreach (var entry in BuildEntries)
+            {
+                if (entry is PatchEntry pe)
+                {
+                    var path = Path.Combine(InstallationPath, pe.Patch.PatchShorthand);
+                    pe.IsDownloaded = Directory.Exists(path) && File.Exists(Path.Combine(path, $"{pe.Patch.GameName}.exe"));
+                }
+            }
+
+            if (SelectedEntry is PatchEntry selectedPe)
+            {
+                StatusText = selectedPe.IsDownloaded ? "Installed" : "Ready to Download";
+            }
         }
     }
 }

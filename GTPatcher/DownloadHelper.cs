@@ -1,40 +1,44 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using static Constants;
 
 namespace GTPatcher_Launcher.Utilities
 {
     public static class DownloadHelper
     {
+        private static readonly HttpClient _httpClient = new HttpClient();
+
         public static int DownloadManifest(ulong manifestId, string directory, string steamUsername, string branch)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var proc = Process.Start("DepotDownloader.exe", $"-app {APP_ID} -depot {DEPOT_ID} -manifest {manifestId.ToString()} -branch {branch} -username {steamUsername} -remember-password -dir \"{directory}\"");
-                proc.WaitForExit();
-                return proc.ExitCode;
-            }
-            else
-            {
-                var proc = Process.Start("DepotDownloader", $"-app {APP_ID} -depot {DEPOT_ID} -manifest {manifestId.ToString()} -branch {branch} -username {steamUsername} -remember-password -dir \"{directory}\"");
-                proc.WaitForExit();
-                return proc.ExitCode;
-            }
+            var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "DepotDownloader.exe" : "DepotDownloader";
+            var arguments = $"-app {APP_ID} -depot {DEPOT_ID} -manifest {manifestId} -branch {branch} -username {steamUsername} -remember-password -dir \"{directory}\"";
+
+            var proc = Process.Start(fileName, arguments);
+            proc.WaitForExit();
+            return proc.ExitCode;
         }
 
-        public static int DownloadUrl(string directory, string url)
+        public static async Task<int> DownloadUrl(string directory, string url)
         {
             try
             {
-                using (var client = new WebClient())
+                var zipPath = Path.Combine(directory, "game.zip");
+                using (var response = await _httpClient.GetAsync(url))
                 {
-                    client.DownloadFile(url, @$"{directory}/game.zip");
+                    response.EnsureSuccessStatusCode();
+                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var fileStream = new FileStream(zipPath, FileMode.Create))
+                    {
+                        await stream.CopyToAsync(fileStream);
+                    }
                 }
-                System.IO.Compression.ZipFile.ExtractToDirectory(@$"{directory}/game.zip", directory);
-                File.Delete(@$"{directory}/game.zip");
+
+                System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, directory);
+                File.Delete(zipPath);
             }
             catch (Exception e)
             {
@@ -44,7 +48,6 @@ namespace GTPatcher_Launcher.Utilities
 
             try
             {
-                // HACK: this is so inefficient, but its the best way i can think of doing it for now
                 foreach (var dir in Directory.GetDirectories(directory))
                 {
                     if (Directory.GetFiles(dir, "*.exe").Length > 0)
@@ -63,23 +66,23 @@ namespace GTPatcher_Launcher.Utilities
             return 0;
         }
         
-        static public void CopyFolder( string sourceFolder, string destFolder )
+        public static void CopyFolder(string sourceFolder, string destFolder)
         {
-            if (!Directory.Exists( destFolder ))
-                Directory.CreateDirectory( destFolder );
-            string[] files = Directory.GetFiles( sourceFolder );
-            foreach (string file in files)
+            if (!Directory.Exists(destFolder))
+                Directory.CreateDirectory(destFolder);
+
+            foreach (string file in Directory.GetFiles(sourceFolder))
             {
-                string name = Path.GetFileName( file );
-                string dest = Path.Combine( destFolder, name );
-                File.Copy( file, dest );
+                string name = Path.GetFileName(file);
+                string dest = Path.Combine(destFolder, name);
+                File.Copy(file, dest, true);
             }
-            string[] folders = Directory.GetDirectories( sourceFolder );
-            foreach (string folder in folders)
+
+            foreach (string folder in Directory.GetDirectories(sourceFolder))
             {
-                string name = Path.GetFileName( folder );
-                string dest = Path.Combine( destFolder, name );
-                CopyFolder( folder, dest );
+                string name = Path.GetFileName(folder);
+                string dest = Path.Combine(destFolder, name);
+                CopyFolder(folder, dest);
             }
         }
     }

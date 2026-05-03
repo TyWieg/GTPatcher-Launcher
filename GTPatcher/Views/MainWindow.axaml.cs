@@ -16,6 +16,7 @@ using GTPatcher.Types;
 using GTPatcher.ViewModels;
 using System.Collections.ObjectModel;
 using Avalonia.Platform;
+using Avalonia.Platform.Storage;
 
 namespace GTPatcher.Views
 {
@@ -25,7 +26,7 @@ namespace GTPatcher.Views
         private Settings Settings;
         private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
 
-        private async void ShowMessageBox(string title, string message)
+        private async Task ShowMessageBox(string title, string message)
         {
             var box = MessageBoxManager
                   .GetMessageBoxStandard(title, message,
@@ -96,12 +97,12 @@ namespace GTPatcher.Views
             }
             catch (Exception ex)
             {
-                ShowMessageBox("Error", "Failed to load builds: " + ex.Message);
+                _ = ShowMessageBox("Error", "Failed to load builds: " + ex.Message);
             }
             
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                ShowMessageBox("Hello there, fellow penguin!", "I see you're on Linux.\nBefore you go ahead and download a build, running this application from a terminal is REQUIRED to type your Steam password into DepotDownloader\nGood luck, have fun! :3");
+                _ = ShowMessageBox("Hello there, fellow penguin!", "I see you're on Linux.\nBefore you go ahead and download a build, running this application from a terminal is REQUIRED to type your Steam password into DepotDownloader\nGood luck, have fun! :3");
             }
         }
 
@@ -116,20 +117,20 @@ namespace GTPatcher.Views
         {
             if (string.IsNullOrEmpty(ViewModel.SteamUsername))
             {
-                ShowMessageBox("Cannot download game", "Put in your Steam account username in the Settings tab.");
+                await ShowMessageBox("Cannot download game", "Put in your Steam account username in the Settings tab.");
                 return;
             }
 
             if (string.IsNullOrEmpty(ViewModel.InstallationPath))
             {
-                ShowMessageBox("Cannot download game", "You don't have an installation path set. Set a folder in the Settings.");
+                await ShowMessageBox("Cannot download game", "You don't have an installation path set. Set a folder in the Settings.");
                 return;
             }
 
             var selectedBuild = ViewModel.SelectedPatch;
             if (selectedBuild == null)
             {
-                ShowMessageBox("Cannot download game", "You need to select a game version first.");
+                await ShowMessageBox("Cannot download game", "You need to select a game version first.");
                 return;
             }
 
@@ -137,16 +138,16 @@ namespace GTPatcher.Views
             if (!Directory.Exists(specificBuildPath))
             {
                 Directory.CreateDirectory(specificBuildPath);
-                if (InstallGame(selectedBuild, specificBuildPath) != 0)
+                if (await InstallGame(selectedBuild, specificBuildPath) != 0)
                 {
-                    ShowMessageBox("Eek...", "Something went wrong!\nMost likely your username or password is incorrect.\nTo prevent problems, the incomplete installation of the game will be deleted.");
+                    await ShowMessageBox("Eek...", "Something went wrong!\nMost likely your username or password is incorrect.\nTo prevent problems, the incomplete installation of the game will be deleted.");
                     if (Directory.Exists(specificBuildPath)) Directory.Delete(specificBuildPath, true);
                     return;
                 }
 
                 if (!string.IsNullOrEmpty(selectedBuild.PatchLink))
                 {
-                    PatchAssembly(selectedBuild, Path.Combine(specificBuildPath, $"{selectedBuild.GameName}_Data", "Managed"));
+                    await PatchAssembly(selectedBuild, Path.Combine(specificBuildPath, $"{selectedBuild.GameName}_Data", "Managed"));
                 }
             }
 
@@ -158,11 +159,11 @@ namespace GTPatcher.Views
             }
             else
             {
-                ShowMessageBox("Manual action required", "Linux builds of the launcher will not auto-start the game due to complexities with Wine/Proton.\nPlease add the build as a non-Steam game in your Steam library, and run it under Proton.");
+                await ShowMessageBox("Manual action required", "Linux builds of the launcher will not auto-start the game due to complexities with Wine/Proton.\nPlease add the build as a non-Steam game in your Steam library, and run it under Proton.");
             }
         }
 
-        private int InstallGame(Patch selectedBuild, string installPath)
+        private async Task<int> InstallGame(Patch selectedBuild, string installPath)
         {
             if (selectedBuild.IsSteam && selectedBuild.ManifestId.HasValue)
             {
@@ -170,12 +171,12 @@ namespace GTPatcher.Views
             }
             else if (!string.IsNullOrEmpty(selectedBuild.GameLink))
             {
-                return DownloadHelper.DownloadUrl(installPath, selectedBuild.GameLink);
+                return await DownloadHelper.DownloadUrl(installPath, selectedBuild.GameLink);
             }
             return 1;
         }
 
-        private async void PatchAssembly(Patch selectedBuild, string managedPath)
+        private async Task PatchAssembly(Patch selectedBuild, string managedPath)
         {
             if (string.IsNullOrEmpty(selectedBuild.PatchLink)) return;
 
@@ -185,35 +186,39 @@ namespace GTPatcher.Views
             if (!File.Exists(dllPath)) return;
 
             File.Move(dllPath, bakPath);
-            HttpClient client = new HttpClient();
-
-            var xdeltaPath = Path.Combine(managedPath, "patch.xdelta");
-            using (var file = File.Create(xdeltaPath))
+            using (HttpClient client = new HttpClient())
             {
-                var stream = await client.GetStreamAsync(selectedBuild.PatchLink);
-                await stream.CopyToAsync(file);
-            }
+                var xdeltaPath = Path.Combine(managedPath, "patch.xdelta");
+                using (var file = File.Create(xdeltaPath))
+                {
+                    var stream = await client.GetStreamAsync(selectedBuild.PatchLink);
+                    await stream.CopyToAsync(file);
+                }
 
-            using (var input = new FileStream(bakPath, FileMode.Open))
-            using (var patch = new FileStream(xdeltaPath, FileMode.Open))
-            using (var output = new FileStream(dllPath, FileMode.Create))
-            {
-                using var decoder = new PleOps.XdeltaSharp.Decoder.Decoder(input, patch, output);
-                decoder.Run();
+                using (var input = new FileStream(bakPath, FileMode.Open))
+                using (var patch = new FileStream(xdeltaPath, FileMode.Open))
+                using (var output = new FileStream(dllPath, FileMode.Create))
+                {
+                    using var decoder = new PleOps.XdeltaSharp.Decoder.Decoder(input, patch, output);
+                    decoder.Run();
+                }
             }
         }
 
         private async void BrowseButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new OpenFolderDialog
-            {
-                Title = "Select Installation Path"
-            };
+            var topLevel = GetTopLevel(this);
+            if (topLevel == null) return;
 
-            var result = await dialog.ShowAsync(this);
-            if (result != null)
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                ViewModel.InstallationPath = result;
+                Title = "Select Installation Path",
+                AllowMultiple = false
+            });
+
+            if (folders.Count > 0)
+            {
+                ViewModel.InstallationPath = folders[0].Path.LocalPath;
             }
         }
     }

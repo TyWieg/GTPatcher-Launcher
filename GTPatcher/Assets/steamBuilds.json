@@ -3588,14 +3588,14 @@
       "Date": "Mar 07"
    },
    {
-      "PatchName": "Beta Build (Mar 07 2022)",
-      "PatchShorthand": "BetaBuild_Mar07_2022",
-      "PatchDescription": "Beta testing branch.",
+      "PatchName": "Mountains Beta (Mar 07 2022)",
+      "PatchShorthand": "MountainsBeta_Mar07_2022",
+      "PatchDescription": "Mountains map beta release. Tons of movement glitches and lots of things to have fun with.",
       "PatchLink": null,
-      "GameLink": null,
+      "GameLink": "https://drive.google.com/file/d/1giDTwL6okZq1gE5ZwH7P-RtMBdBrs_IA/view",
       "GameName": "Gorilla Tag",
       "ManifestId": 9066807640258182301,
-      "IsSteam": true,
+      "IsSteam": false,
       "Branch": "beta",
       "Year": 2022,
       "Date": "Mar 07"

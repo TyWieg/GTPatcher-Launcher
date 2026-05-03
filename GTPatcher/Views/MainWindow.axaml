@@ -23,10 +23,10 @@
             </Border>
         </DataTemplate>
         <DataTemplate DataType="vm:PatchEntry">
-            <Border Padding="15,5">
+            <Border Padding="15,5" Background="Transparent">
                 <Grid ColumnDefinitions="*, Auto">
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding Patch.PatchName}" FontSize="13"/>
+                        <TextBlock Text="{Binding Patch.PatchName}" FontSize="13" Foreground="White"/>
                         <TextBlock Text="{Binding Patch.Date}" FontSize="11" Foreground="#888888"/>
                     </StackPanel>
                     <Ellipse Grid.Column="1" Width="8" Height="8" Fill="#4caf50"
@@ -36,7 +36,7 @@
         </DataTemplate>
     </Window.DataTemplates>
 
-	<Grid RowDefinitions="Auto, *">
+	<Grid RowDefinitions="Auto, *, Auto">
         <!-- Header -->
         <Border Grid.Row="0" Background="#252525" Padding="15" BorderBrush="#333333" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="20">
@@ -155,5 +155,10 @@
                 </Border>
             </StackPanel>
         </Carousel>
+
+        <!-- Debug Info Footer (Visible when something is wrong) -->
+        <Border Grid.Row="2" Background="#111111" Padding="5" BorderBrush="#333333" BorderThickness="0,1,0,0">
+             <TextBlock Text="{Binding DebugInfo}" FontSize="10" Foreground="#666666" HorizontalAlignment="Center"/>
+        </Border>
 	</Grid>
 </Window>

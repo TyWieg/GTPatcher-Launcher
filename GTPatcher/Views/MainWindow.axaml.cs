@@ -17,6 +17,7 @@ using GTPatcher.ViewModels;
 using System.Collections.ObjectModel;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
+using System.Reflection;
 
 namespace GTPatcher.Views
 {
@@ -68,39 +69,26 @@ namespace GTPatcher.Views
         {
             try
             {
-                // Try multiple URI formats for robustness
-                string[] uris = {
-                    "avares://GTPatcher/Assets/steamBuilds.json",
-                    "avares://GTPatcher/GTPatcher/Assets/steamBuilds.json"
-                };
+                ViewModel.DebugInfo = "Loading builds...";
+                var assembly = Assembly.GetExecutingAssembly();
+                var resourceName = "GTPatcher.Assets.steamBuilds.json";
 
-                Stream? stream = null;
-                foreach (var uriStr in uris)
+                using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
                 {
-                    try {
-                        stream = AssetLoader.Open(new Uri(uriStr));
-                        if (stream != null) break;
-                    } catch { }
-                }
-
-                if (stream == null)
-                {
-                    // Fallback to direct file read if running in dev environment
-                    if (File.Exists("GTPatcher/Assets/steamBuilds.json"))
+                    if (stream == null)
                     {
-                        stream = File.OpenRead("GTPatcher/Assets/steamBuilds.json");
+                        ViewModel.DebugInfo = $"Resource not found: {resourceName}. Available: " + string.Join(", ", assembly.GetManifestResourceNames());
+                        _ = ShowMessageBox("Error", ViewModel.DebugInfo);
+                        return;
                     }
-                }
 
-                if (stream != null)
-                {
-                    using (stream)
                     using (var reader = new StreamReader(stream))
                     {
                         var buildsJson = reader.ReadToEnd();
                         var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
                         if (builds != null)
                         {
+                            ViewModel.DebugInfo = $"Loaded {builds.Count} builds.";
                             var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
                             var entries = new List<ListEntry>();
                             int currentYear = -1;
@@ -118,16 +106,17 @@ namespace GTPatcher.Views
                             ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
                             ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
                         }
+                        else
+                        {
+                            ViewModel.DebugInfo = "Builds list is null after deserialization.";
+                        }
                     }
-                }
-                else
-                {
-                     _ = ShowMessageBox("Error", "Could not find steamBuilds.json asset in any location.");
                 }
             }
             catch (Exception ex)
             {
-                _ = ShowMessageBox("Error", "Failed to load builds: " + ex.Message);
+                ViewModel.DebugInfo = "Failed to load builds: " + ex.Message;
+                _ = ShowMessageBox("Error", ViewModel.DebugInfo);
             }
             
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

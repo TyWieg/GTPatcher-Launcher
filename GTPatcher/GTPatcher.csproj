@@ -18,6 +18,7 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Assets\steamBuilds.json" />
   </ItemGroup>
 
   <ItemGroup>

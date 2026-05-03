@@ -14,12 +14,21 @@ namespace GTPatcher_Launcher.Utilities
 
         public static int DownloadManifest(ulong manifestId, string directory, string steamUsername, string branch)
         {
-            var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "DepotDownloader.exe" : "DepotDownloader";
-            var arguments = $"-app {APP_ID} -depot {DEPOT_ID} -manifest {manifestId} -branch {branch} -username {steamUsername} -remember-password -dir \"{directory}\"";
+            try
+            {
+                var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "DepotDownloader.exe" : "DepotDownloader";
+                var arguments = $"-app {APP_ID} -depot {DEPOT_ID} -manifest {manifestId} -branch {branch} -username {steamUsername} -remember-password -dir \"{directory}\"";
 
-            var proc = Process.Start(fileName, arguments);
-            proc.WaitForExit();
-            return proc.ExitCode;
+                var proc = Process.Start(fileName, arguments);
+                if (proc == null) return 1;
+                proc.WaitForExit();
+                return proc.ExitCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error downloading manifest: {ex.Message}");
+                return 1;
+            }
         }
 
         public static async Task<int> DownloadUrl(string directory, string url)
@@ -42,7 +51,7 @@ namespace GTPatcher_Launcher.Utilities
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"Error downloading URL: {e.Message}");
                 return 1;
             }
 
@@ -59,7 +68,7 @@ namespace GTPatcher_Launcher.Utilities
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"Error during directory cleanup: {e.Message}");
                 return 1;
             }
 

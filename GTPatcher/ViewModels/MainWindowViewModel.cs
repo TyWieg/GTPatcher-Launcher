@@ -4,6 +4,7 @@ using GTPatcher.Types;
 using ReactiveUI;
 using System.IO;
 using System;
+using System.Linq;
 
 namespace GTPatcher.ViewModels
 {
@@ -57,7 +58,7 @@ namespace GTPatcher.ViewModels
             set => this.RaiseAndSetIfChanged(ref _selectedPatch, value);
         }
 
-        private int _selectedTabIndex;
+        private int _selectedTabIndex = 0;
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
@@ -89,6 +90,13 @@ namespace GTPatcher.ViewModels
             set => this.RaiseAndSetIfChanged(ref _statusText, value);
         }
 
+        private string _debugInfo = "Initializing...";
+        public string DebugInfo
+        {
+            get => _debugInfo;
+            set => this.RaiseAndSetIfChanged(ref _debugInfo, value);
+        }
+
         public void UpdateDownloadedStatus()
         {
             if (string.IsNullOrEmpty(InstallationPath)) return;
@@ -97,8 +105,10 @@ namespace GTPatcher.ViewModels
             {
                 if (entry is PatchEntry pe)
                 {
-                    var path = Path.Combine(InstallationPath, pe.Patch.PatchShorthand);
-                    pe.IsDownloaded = Directory.Exists(path) && File.Exists(Path.Combine(path, $"{pe.Patch.GameName}.exe"));
+                    try {
+                        var path = Path.Combine(InstallationPath, pe.Patch.PatchShorthand);
+                        pe.IsDownloaded = Directory.Exists(path) && File.Exists(Path.Combine(path, $"{pe.Patch.GameName}.exe"));
+                    } catch { }
                 }
             }
 

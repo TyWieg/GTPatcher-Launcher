@@ -11,7 +11,7 @@ public class Patch
     public string? PatchLink { get; set; }
     public string? GameLink { get; set; }
     public string GameName { get; set; } = "Gorilla Tag";
-    public long? ManifestId { get; set; }
+    public ulong? ManifestId { get; set; }
     public bool IsSteam { get; set; }
     public string? Branch { get; set; }
     public int Year { get; set; }

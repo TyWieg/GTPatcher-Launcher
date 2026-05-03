@@ -20,7 +20,7 @@
         <!-- Header -->
         <Border Grid.Row="0" Background="#252525" Padding="15" BorderBrush="#333333" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="20">
-                <TextBlock Text="GTPatcher" FontSize="20" FontWeight="Bold" Foreground="#e0e0e0"/>
+                <TextBlock Text="GTPatcher" FontSize="20" FontWeight="Bold" Foreground="#aa39ff"/>
                 <TabStrip x:Name="MainTabStrip" Background="Transparent" SelectedIndex="{Binding SelectedTabIndex}">
                     <TabStripItem Content="Installations" />
                     <TabStripItem Content="Settings" />
@@ -35,20 +35,30 @@
             <Grid ColumnDefinitions="300, *">
                 <!-- Build List Sidebar -->
                 <Border Grid.Column="0" Background="#252525" BorderBrush="#333333" BorderThickness="0,0,1,0">
-                    <ListBox ItemsSource="{Binding GroupedBuilds}"
-                             SelectedItem="{Binding SelectedPatch}"
+                    <ListBox ItemsSource="{Binding BuildEntries}"
+                             SelectedItem="{Binding SelectedEntry}"
                              Background="Transparent"
                              BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="types:Patch">
-                                <Border Padding="5">
+                        <ListBox.DataTemplates>
+                            <DataTemplate DataType="vm:YearHeader">
+                                <Border Background="#333333" Padding="10,5" Margin="0,10,0,5">
+                                    <TextBlock Text="{Binding Year}" FontWeight="Bold" Foreground="#aa39ff"/>
+                                </Border>
+                            </DataTemplate>
+                            <DataTemplate DataType="vm:PatchEntry">
+                                <Border Padding="15,5">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding PatchName}" FontSize="13"/>
-                                        <TextBlock Text="{Binding Date}" FontSize="11" Foreground="#888888"/>
+                                        <TextBlock Text="{Binding Patch.PatchName}" FontSize="13"/>
+                                        <TextBlock Text="{Binding Patch.Date}" FontSize="11" Foreground="#888888"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
-                        </ListBox.ItemTemplate>
+                        </ListBox.DataTemplates>
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                            </Style>
+                        </ListBox.Styles>
                     </ListBox>
                 </Border>
 
@@ -95,6 +105,8 @@
                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                             FontSize="16" FontWeight="Bold"
                             Click="PlayButton"
+                            Background="#aa39ff"
+                            Foreground="White"
                             IsVisible="{Binding SelectedPatch, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                 </Grid>
             </Grid>
@@ -123,6 +135,7 @@
             <StackPanel Margin="40" Spacing="20">
                 <TextBlock Text="Gorilla Tag Patcher Launcher" FontSize="32" FontWeight="Bold"/>
                 <TextBlock Text="Version 1.0.0 (Modern Edition)" FontSize="16" Foreground="#888888"/>
+                <TextBlock Text="Based on GTPatcher by GT-Archive-Team" FontSize="14" Foreground="#aaaaaa" Margin="0,-15,0,0"/>
 
                 <Border Background="#252525" Padding="20" CornerRadius="8" BorderBrush="#333333" BorderThickness="1">
                     <TextBlock TextWrapping="Wrap" LineHeight="20">

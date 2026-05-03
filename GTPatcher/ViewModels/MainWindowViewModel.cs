@@ -1,16 +1,43 @@
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using GTPatcher.Types;
 using ReactiveUI;
 
 namespace GTPatcher.ViewModels
 {
+    public class ListEntry { }
+
+    public class YearHeader : ListEntry
+    {
+        public int Year { get; set; }
+    }
+
+    public class PatchEntry : ListEntry
+    {
+        public Patch Patch { get; set; } = null!;
+    }
+
     public class MainWindowViewModel : ViewModelBase
     {
-        private ObservableCollection<Patch> _groupedBuilds = new();
-        public ObservableCollection<Patch> GroupedBuilds
+        private ObservableCollection<ListEntry> _buildEntries = new();
+        public ObservableCollection<ListEntry> BuildEntries
         {
-            get => _groupedBuilds;
-            set => this.RaiseAndSetIfChanged(ref _groupedBuilds, value);
+            get => _buildEntries;
+            set => this.RaiseAndSetIfChanged(ref _buildEntries, value);
+        }
+
+        private ListEntry? _selectedEntry;
+        public ListEntry? SelectedEntry
+        {
+            get => _selectedEntry;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _selectedEntry, value);
+                if (value is PatchEntry pe)
+                {
+                    SelectedPatch = pe.Patch;
+                }
+            }
         }
 
         private Patch? _selectedPatch;

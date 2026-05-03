@@ -75,8 +75,22 @@ namespace GTPatcher.Views
                     var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
                     if (builds != null)
                     {
-                        ViewModel.GroupedBuilds = new ObservableCollection<Patch>(builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId));
-                        ViewModel.SelectedPatch = ViewModel.GroupedBuilds.FirstOrDefault();
+                        var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
+                        var entries = new List<ListEntry>();
+                        int currentYear = -1;
+
+                        foreach (var build in sortedBuilds)
+                        {
+                            if (build.Year != currentYear)
+                            {
+                                currentYear = build.Year;
+                                entries.Add(new YearHeader { Year = currentYear });
+                            }
+                            entries.Add(new PatchEntry { Patch = build });
+                        }
+
+                        ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
+                        ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
                     }
                 }
             }

@@ -68,31 +68,61 @@ namespace GTPatcher.Views
         {
             try
             {
-                // Load from bundled asset
-                using (var stream = AssetLoader.Open(new Uri("avares://GTPatcher/Assets/steamBuilds.json")))
-                using (var reader = new StreamReader(stream))
+                // Try multiple URI formats for robustness
+                string[] uris = {
+                    "avares://GTPatcher/Assets/steamBuilds.json",
+                    "avares://GTPatcher/GTPatcher/Assets/steamBuilds.json"
+                };
+
+                Stream? stream = null;
+                foreach (var uriStr in uris)
                 {
-                    var buildsJson = reader.ReadToEnd();
-                    var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
-                    if (builds != null)
+                    try {
+                        stream = AssetLoader.Open(new Uri(uriStr));
+                        if (stream != null) break;
+                    } catch { }
+                }
+
+                if (stream == null)
+                {
+                    // Fallback to direct file read if running in dev environment
+                    if (File.Exists("GTPatcher/Assets/steamBuilds.json"))
                     {
-                        var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
-                        var entries = new List<ListEntry>();
-                        int currentYear = -1;
-
-                        foreach (var build in sortedBuilds)
-                        {
-                            if (build.Year != currentYear)
-                            {
-                                currentYear = build.Year;
-                                entries.Add(new YearHeader { Year = currentYear });
-                            }
-                            entries.Add(new PatchEntry { Patch = build });
-                        }
-
-                        ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
-                        ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
+                        stream = File.OpenRead("GTPatcher/Assets/steamBuilds.json");
                     }
+                }
+
+                if (stream != null)
+                {
+                    using (stream)
+                    using (var reader = new StreamReader(stream))
+                    {
+                        var buildsJson = reader.ReadToEnd();
+                        var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
+                        if (builds != null)
+                        {
+                            var sortedBuilds = builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId).ToList();
+                            var entries = new List<ListEntry>();
+                            int currentYear = -1;
+
+                            foreach (var build in sortedBuilds)
+                            {
+                                if (build.Year != currentYear)
+                                {
+                                    currentYear = build.Year;
+                                    entries.Add(new YearHeader { Year = currentYear });
+                                }
+                                entries.Add(new PatchEntry { Patch = build });
+                            }
+
+                            ViewModel.BuildEntries = new ObservableCollection<ListEntry>(entries);
+                            ViewModel.SelectedEntry = ViewModel.BuildEntries.FirstOrDefault(e => e is PatchEntry);
+                        }
+                    }
+                }
+                else
+                {
+                     _ = ShowMessageBox("Error", "Could not find steamBuilds.json asset in any location.");
                 }
             }
             catch (Exception ex)

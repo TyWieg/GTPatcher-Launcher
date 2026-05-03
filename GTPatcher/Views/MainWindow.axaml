@@ -2,87 +2,140 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:GTPatcher.ViewModels"
+        xmlns:types="using:GTPatcher.Types"
         mc:Ignorable="d"
         Title="Gorilla Tag Patcher Launcher"
-        Width="800" Height="450"
+        Width="900" Height="600"
         CanResize="False"
-        x:Class="GTPatcher.Views.MainWindow">
+        x:Class="GTPatcher.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Background="#1e1e1e">
 
-	<Grid>
-		<TabControl x:Name="MainTabControl">
-			<!-- Installations Tab -->
-			<TabItem Header="Installations" x:Name="InstallationTab">
-				<Grid>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto"/>
-						<RowDefinition Height="*"/>
-						<RowDefinition Height="Auto"/>
-					</Grid.RowDefinitions>
-					<StackPanel Margin="10">
-						<TextBlock Text="Build" FontWeight="Bold"/>
-						<ComboBox Width="300" x:Name="Builds" SelectionChanged="steamBuildBox_SelectedIndexChanged"/>
-						<TextBlock Text="Manifest" FontWeight="Bold" Margin="0,10,0,0"/>
-						<TextBlock x:Name="manifestIdLabel" Text="No Steam manifest for this build" Margin="0,5,0,0"/>
-						<TextBlock x:Name="descriptionLabel"
-						   Text="No description for this patch"
-						   Margin="0,5,0,0"
-						   FontSize="11"
-						   TextWrapping="Wrap"/>
-					</StackPanel>
-					<Button Grid.Row="2" Content="Play!" HorizontalAlignment="Right" Margin="10" Padding="10,5"  Click="PlayButton"/>
-				</Grid>
-			</TabItem>
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
 
-			<!-- Settings Tab -->
-			<TabItem Header="Settings" x:Name="SettingsTab">
-				<StackPanel Margin="10">
-					<TextBlock Text="Steam Account Username" FontWeight="Bold" Margin="0,0,0,5"/>
-					<TextBox x:Name="UserTextBox" HorizontalAlignment="Stretch" Margin="0,0,0,5" TextChanged="SteamUserTextBox_TextChanged"/>
-					<TextBlock Text="You will be asked for your account password (and any Steam Guard verification if needed) upon downloading a Steam build of the game" FontSize="10" Margin="0,0,0,20"/>
+	<Grid RowDefinitions="Auto, *">
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#252525" Padding="15" BorderBrush="#333333" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="20">
+                <TextBlock Text="GTPatcher" FontSize="20" FontWeight="Bold" Foreground="#e0e0e0"/>
+                <TabStrip x:Name="MainTabStrip" Background="Transparent" SelectedIndex="{Binding SelectedTabIndex}">
+                    <TabStripItem Content="Installations" />
+                    <TabStripItem Content="Settings" />
+                    <TabStripItem Content="Info" />
+                </TabStrip>
+            </StackPanel>
+        </Border>
 
-					<TextBlock Text="Installation Path" FontWeight="Bold" Margin="0,0,0,5"/>
-					<Grid>
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" />
-						</Grid.ColumnDefinitions>
-						<Button Content="Browse..." Grid.Column="0" Click="BrowseButton_Click"/>
-						<TextBox x:Name="PathTextBox" Grid.Column="1" HorizontalAlignment="Stretch" Margin="10,0,0,0" TextChanged="PathTextBox_TextChanged"/>
-					</Grid>
-					<!--
-					<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-						<TextBlock Text="Dark Mode" VerticalAlignment="Center" Margin="0,0,10,0"/>
-						<CheckBox x:Name="DarkModeCheckBox" VerticalAlignment="Center" Checked="DarkModeCheckBox_Checked" Unchecked="DarkModeCheckBox_Unchecked"/>
-					</StackPanel>
-					-->
-				</StackPanel>
-			</TabItem>
+        <!-- Content -->
+        <Carousel Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}">
+            <!-- Installations Tab Content -->
+            <Grid ColumnDefinitions="300, *">
+                <!-- Build List Sidebar -->
+                <Border Grid.Column="0" Background="#252525" BorderBrush="#333333" BorderThickness="0,0,1,0">
+                    <ListBox ItemsSource="{Binding GroupedBuilds}"
+                             SelectedItem="{Binding SelectedPatch}"
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="types:Patch">
+                                <Border Padding="5">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding PatchName}" FontSize="13"/>
+                                        <TextBlock Text="{Binding Date}" FontSize="11" Foreground="#888888"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
 
-			<!-- Info Tab -->
-			<TabItem Header="Info" x:Name="InfoTab">
-				<StackPanel Margin="10">
-					<TextBlock Text="Gorilla Tag Patcher Launcher" FontSize="30" FontWeight="Bold" Margin="0,0,0,0"/>
-					<TextBlock Text="beta 0.5.0" FontSize="14" Margin="0,0,0,275">
-						<ToolTip.Tip>
-							<StackPanel>
-								<TextBlock>Now, these points of data make a beautiful line</TextBlock>
-								<TextBlock>And we're out of beta, we're releasing on time</TextBlock>
-								<TextBlock>So I'm GLaD I got burned, think of all the things we learned</TextBlock>
-								<TextBlock>For the people who are Still Alive</TextBlock>
-							</StackPanel>
-						</ToolTip.Tip>
-					</TextBlock>
-					<TextBlock TextWrapping="Wrap" FontSize="10">
-						GTPatcher is not affiliated with or endorsed by Another Axiom.
-						<LineBreak/>
-						GTPatcher is not intended to aid or facilitate piracy.
-						<LineBreak/>
-						Please do not inquire for help about GTPatcher in any official Another Axiom community.
-						<LineBreak/>
-						Doing so is both annoying to Another Axiom employees and to us. Don't do it!
-					</TextBlock>
-				</StackPanel>
-			</TabItem>
-		</TabControl>
+                <!-- Build Details -->
+                <Grid Grid.Column="1" RowDefinitions="*, Auto" Margin="20">
+                    <StackPanel Spacing="15" IsVisible="{Binding SelectedPatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <TextBlock Text="{Binding SelectedPatch.PatchName}" FontSize="24" FontWeight="Bold" Foreground="#ffffff"/>
+
+                        <Border Background="#333333" CornerRadius="5" Padding="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Description" FontWeight="SemiBold" Foreground="#aaaaaa" FontSize="12"/>
+                                <TextBlock Text="{Binding SelectedPatch.PatchDescription}" TextWrapping="Wrap" FontSize="14"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="Auto, *">
+                            <StackPanel Grid.Column="0" Spacing="10" Width="150">
+                                <TextBlock Text="Year" FontWeight="SemiBold" Foreground="#aaaaaa" FontSize="12"/>
+                                <TextBlock Text="{Binding SelectedPatch.Year}" FontSize="14"/>
+
+                                <TextBlock Text="Branch" FontWeight="SemiBold" Foreground="#aaaaaa" FontSize="12" Margin="0,10,0,0"/>
+                                <TextBlock Text="{Binding SelectedPatch.Branch}" FontSize="14"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="10">
+                                <TextBlock Text="Manifest ID" FontWeight="SemiBold" Foreground="#aaaaaa" FontSize="12"/>
+                                <TextBlock Text="{Binding SelectedPatch.ManifestId}" FontSize="14"/>
+
+                                <TextBlock Text="Status" FontWeight="SemiBold" Foreground="#aaaaaa" FontSize="12" Margin="0,10,0,0"/>
+                                <TextBlock Text="Ready to patch" FontSize="14" Foreground="#4caf50"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <TextBlock IsVisible="{Binding SelectedPatch, Converter={x:Static ObjectConverters.IsNull}}"
+                               Text="Select a build from the list to see details"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="#888888"/>
+
+                    <!-- Play Button -->
+                    <Button Grid.Row="1"
+                            Content="Play!"
+                            HorizontalAlignment="Right"
+                            Width="120" Height="40"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            FontSize="16" FontWeight="Bold"
+                            Click="PlayButton"
+                            IsVisible="{Binding SelectedPatch, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                </Grid>
+            </Grid>
+
+            <!-- Settings Tab Content -->
+            <ScrollViewer>
+                <StackPanel Margin="40" Spacing="25" MaxWidth="600" HorizontalAlignment="Left">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Steam Account Username" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding SteamUsername, Mode=TwoWay}" Watermark="Enter Steam username"/>
+                        <TextBlock Text="You will be asked for your account password (and Steam Guard) when downloading."
+                                   FontSize="12" Foreground="#888888"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Installation Path" FontSize="16" FontWeight="SemiBold"/>
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBox Grid.Column="0" Text="{Binding InstallationPath, Mode=TwoWay}" Watermark="Select folder..."/>
+                            <Button Grid.Column="1" Content="Browse..." Margin="10,0,0,0" Click="BrowseButton_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Info Tab Content -->
+            <StackPanel Margin="40" Spacing="20">
+                <TextBlock Text="Gorilla Tag Patcher Launcher" FontSize="32" FontWeight="Bold"/>
+                <TextBlock Text="Version 1.0.0 (Modern Edition)" FontSize="16" Foreground="#888888"/>
+
+                <Border Background="#252525" Padding="20" CornerRadius="8" BorderBrush="#333333" BorderThickness="1">
+                    <TextBlock TextWrapping="Wrap" LineHeight="20">
+                        GTPatcher is a community-driven tool for accessing historical builds of Gorilla Tag.
+                        <LineBreak/><LineBreak/>
+                        • Not affiliated with Another Axiom.
+                        <LineBreak/>
+                        • Requires a valid Steam account with Gorilla Tag.
+                        <LineBreak/>
+                        • Please support the official game!
+                    </TextBlock>
+                </Border>
+            </StackPanel>
+        </Carousel>
 	</Grid>
 </Window>

@@ -1,8 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Media;
-using Avalonia.VisualTree;
-using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -12,45 +9,21 @@ using MsBox.Avalonia.Enums;
 using Newtonsoft.Json;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.IO;
 using GTPatcher_Launcher.Utilities;
 using GTPatcher.Types;
-using static Constants;
+using GTPatcher.ViewModels;
+using System.Collections.ObjectModel;
+using Avalonia.Platform;
 
 namespace GTPatcher.Views
 {
-    
-    public static class VisualTreeHelperExtensions
-    {
-        public static IEnumerable<T> FindVisualChildren<T>(this Control control) where T : Control
-        {
-            var results = new List<T>();
-            if (control == null) return results;
-
-            foreach (var child in control.GetVisualChildren())
-            {
-                if (child is T tChild)
-                {
-                    results.Add(tChild);
-                }
-                
-                if (child is Control childControl)
-                {
-                    results.AddRange(FindVisualChildren<T>(childControl));
-                }
-            }
-
-            return results;
-        }
-    }
-
     public partial class MainWindow : Window
     {
-        private const string RegistryKeyPath = @"HKEY_CURRENT_USER\SOFTWARE\GTPatcher";
         private string SettingsPath;
         private Settings Settings;
+        private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
 
         private async void ShowMessageBox(string title, string message)
         {
@@ -58,46 +31,58 @@ namespace GTPatcher.Views
                   .GetMessageBoxStandard(title, message,
                       ButtonEnum.Ok);
 
-            var result = await box.ShowAsync();
+            await box.ShowAsync();
         }
 
         public MainWindow()
         {
             InitializeComponent();
-            if (!Path.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "GTPatcher")))
+            DataContext = new MainWindowViewModel();
+
+            var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GTPatcher");
+            if (!Directory.Exists(appData))
             {
-                Directory.CreateDirectory(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GTPatcher"));
+                Directory.CreateDirectory(appData);
             }
-            SettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GTPatcher/settings.json");
+            SettingsPath = Path.Combine(appData, "settings.json");
             Settings = File.Exists(SettingsPath) ? JsonConvert.DeserializeObject<Settings>(File.ReadAllText(SettingsPath))! : new Settings();
-            PathTextBox.Text = Settings.Path;
-            UserTextBox.Text = Settings.Username;
+
+            ViewModel.InstallationPath = Settings.Path ?? string.Empty;
+            ViewModel.SteamUsername = Settings.Username ?? string.Empty;
+
+            // Subscribe to settings changes
+            ViewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(MainWindowViewModel.InstallationPath) ||
+                    e.PropertyName == nameof(MainWindowViewModel.SteamUsername))
+                {
+                    SaveSettings();
+                }
+            };
+
             LoadBuilds();
         }
 
-        private List<Patch>? BuildsList;
-
-        private async void LoadBuilds()
+        private void LoadBuilds()
         {
-            HttpClient client = new HttpClient();
-            client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue { NoCache = true };
-            BuildsList = JsonConvert.DeserializeObject<List<Patch>>(await client.GetStringAsync(INDEX_JSON), new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
-
-            if (Builds == null)
+            try
             {
-                ShowMessageBox("Error", "Failed to retrieve builds list. Check your internet connection!");
-                return;
+                // Load from bundled asset
+                using (var stream = AssetLoader.Open(new Uri("avares://GTPatcher/Assets/steamBuilds.json")))
+                using (var reader = new StreamReader(stream))
+                {
+                    var buildsJson = reader.ReadToEnd();
+                    var builds = JsonConvert.DeserializeObject<List<Patch>>(buildsJson);
+                    if (builds != null)
+                    {
+                        ViewModel.GroupedBuilds = new ObservableCollection<Patch>(builds.OrderByDescending(p => p.Year).ThenByDescending(p => p.ManifestId));
+                        ViewModel.SelectedPatch = ViewModel.GroupedBuilds.FirstOrDefault();
+                    }
+                }
             }
-
-            Builds.ItemsSource = BuildsList.Select(p => p.PatchName).ToList();
-
-            if (BuildsList.Any())
+            catch (Exception ex)
             {
-                Builds.SelectedItem = BuildsList.First().PatchName;
-                var selectedBuild = BuildsList.FirstOrDefault(x => x.PatchName == Builds.SelectedItem as string);
-                manifestIdLabel.Text = string.IsNullOrEmpty(selectedBuild.ManifestId.ToString()) ? "No Steam manifest for this build" : selectedBuild.ManifestId.ToString();
-                descriptionLabel.Text = string.IsNullOrEmpty(selectedBuild.PatchDescription) ? "No description for this patch" : selectedBuild.PatchDescription;
+                ShowMessageBox("Error", "Failed to load builds: " + ex.Message);
             }
             
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -108,68 +93,54 @@ namespace GTPatcher.Views
 
         private void SaveSettings()
         {
-            Settings.Path = PathTextBox.Text;
-            Settings.Username = UserTextBox.Text;
-            if (!File.Exists(SettingsPath)) File.Create(SettingsPath).Close();
+            Settings.Path = ViewModel.InstallationPath;
+            Settings.Username = ViewModel.SteamUsername;
             File.WriteAllText(SettingsPath, JsonConvert.SerializeObject(Settings));
-        }
-
-        private void PathTextBox_TextChanged(object? sender, Avalonia.Controls.TextChangedEventArgs e)
-        {
-            SaveSettings();
-        }
-
-        private void SteamUserTextBox_TextChanged(object? sender, Avalonia.Controls.TextChangedEventArgs e)
-        {
-            SaveSettings();
-        }
-
-        private void steamBuildBox_SelectedIndexChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var selectedBuild = BuildsList.FirstOrDefault(x => x.PatchName == Builds.SelectedItem as string);
-            if (selectedBuild == null) return;
-            manifestIdLabel.Text = string.IsNullOrEmpty(selectedBuild.ManifestId.ToString()) ? "No Steam manifest for this build" : selectedBuild.ManifestId.ToString();
-            descriptionLabel.Text = string.IsNullOrEmpty(selectedBuild.PatchDescription) ? "No description for this patch" : selectedBuild.PatchDescription;
         }
 
         private async void PlayButton(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(UserTextBox.Text))
+            if (string.IsNullOrEmpty(ViewModel.SteamUsername))
             {
                 ShowMessageBox("Cannot download game", "Put in your Steam account username in the Settings tab.");
                 return;
             }
 
-            if (string.IsNullOrEmpty(PathTextBox.Text))
+            if (string.IsNullOrEmpty(ViewModel.InstallationPath))
             {
                 ShowMessageBox("Cannot download game", "You don't have an installation path set. Set a folder in the Settings.");
                 return;
             }
 
-            var selectedBuild = BuildsList.FirstOrDefault(x => x.PatchName == Builds.SelectedItem as string);
+            var selectedBuild = ViewModel.SelectedPatch;
             if (selectedBuild == null)
             {
                 ShowMessageBox("Cannot download game", "You need to select a game version first.");
                 return;
             }
 
-            var specificBuildPath = $"{PathTextBox.Text}/{selectedBuild.PatchShorthand}";
+            var specificBuildPath = Path.Combine(ViewModel.InstallationPath, selectedBuild.PatchShorthand);
             if (!Directory.Exists(specificBuildPath))
             {
                 Directory.CreateDirectory(specificBuildPath);
                 if (InstallGame(selectedBuild, specificBuildPath) != 0)
                 {
                     ShowMessageBox("Eek...", "Something went wrong!\nMost likely your username or password is incorrect.\nTo prevent problems, the incomplete installation of the game will be deleted.");
-                    Directory.Delete(specificBuildPath, true);
+                    if (Directory.Exists(specificBuildPath)) Directory.Delete(specificBuildPath, true);
                     return;
                 }
-                PatchAssembly(selectedBuild, $"{specificBuildPath}/{selectedBuild.GameName}_Data/Managed");
+
+                if (!string.IsNullOrEmpty(selectedBuild.PatchLink))
+                {
+                    PatchAssembly(selectedBuild, Path.Combine(specificBuildPath, $"{selectedBuild.GameName}_Data", "Managed"));
+                }
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                if (File.Exists($"{specificBuildPath}/{selectedBuild.GameName}.exe"))
-                    Process.Start($"{specificBuildPath}/{selectedBuild.GameName}.exe");
+                var exePath = Path.Combine(specificBuildPath, $"{selectedBuild.GameName}.exe");
+                if (File.Exists(exePath))
+                    Process.Start(exePath);
             }
             else
             {
@@ -179,33 +150,43 @@ namespace GTPatcher.Views
 
         private int InstallGame(Patch selectedBuild, string installPath)
         {
-            if (selectedBuild.IsSteam)
+            if (selectedBuild.IsSteam && selectedBuild.ManifestId.HasValue)
             {
-                return DownloadHelper.DownloadManifest((ulong)selectedBuild.ManifestId, installPath, UserTextBox.Text, selectedBuild.Branch);
+                return DownloadHelper.DownloadManifest((ulong)selectedBuild.ManifestId.Value, installPath, ViewModel.SteamUsername, selectedBuild.Branch ?? "public");
             }
-            else
+            else if (!string.IsNullOrEmpty(selectedBuild.GameLink))
             {
                 return DownloadHelper.DownloadUrl(installPath, selectedBuild.GameLink);
             }
+            return 1;
         }
 
         private async void PatchAssembly(Patch selectedBuild, string managedPath)
         {
-            File.Move($"{managedPath}/Assembly-CSharp.dll", $"{managedPath}/Assembly-CSharp.bak");
+            if (string.IsNullOrEmpty(selectedBuild.PatchLink)) return;
+
+            var dllPath = Path.Combine(managedPath, "Assembly-CSharp.dll");
+            var bakPath = Path.Combine(managedPath, "Assembly-CSharp.bak");
+
+            if (!File.Exists(dllPath)) return;
+
+            File.Move(dllPath, bakPath);
             HttpClient client = new HttpClient();
-            client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue { NoCache = true };
 
-            using var input = new FileStream($"{managedPath}/Assembly-CSharp.bak", FileMode.Open);
-            var file = File.Create($"{managedPath}/patch.xdelta");
-            var stream = await client.GetStreamAsync(selectedBuild.PatchLink);
-            stream.CopyTo(file);
-            file.Close();
-            using var patch = new FileStream($"{managedPath}/patch.xdelta", FileMode.Open);
-            using var output = new FileStream($"{managedPath}/Assembly-CSharp.dll", FileMode.Create);
+            var xdeltaPath = Path.Combine(managedPath, "patch.xdelta");
+            using (var file = File.Create(xdeltaPath))
+            {
+                var stream = await client.GetStreamAsync(selectedBuild.PatchLink);
+                await stream.CopyToAsync(file);
+            }
 
-            using var decoder = new PleOps.XdeltaSharp.Decoder.Decoder(input, patch, output);
-
-            decoder.Run();
+            using (var input = new FileStream(bakPath, FileMode.Open))
+            using (var patch = new FileStream(xdeltaPath, FileMode.Open))
+            using (var output = new FileStream(dllPath, FileMode.Create))
+            {
+                using var decoder = new PleOps.XdeltaSharp.Decoder.Decoder(input, patch, output);
+                decoder.Run();
+            }
         }
 
         private async void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -215,16 +196,11 @@ namespace GTPatcher.Views
                 Title = "Select Installation Path"
             };
 
-            var result = dialog.ShowAsync(this);
-            await result.ContinueWith(task =>
+            var result = await dialog.ShowAsync(this);
+            if (result != null)
             {
-                if (task.Result != null)
-                {
-                    var selectedPath = task.Result;
-                    PathTextBox.Text = selectedPath;
-                    SaveSettings();
-                }
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+                ViewModel.InstallationPath = result;
+            }
         }
     }
 }
